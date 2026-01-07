@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>FLUX v5 – Creator Intelligence Engine</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- React -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+<style>
+body { background:#050507; color:#e5e7eb; }
+.locked { filter: blur(2px); pointer-events:none; opacity:0.35 }
+</style>
+</head>
+
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+/* -------------------- Utilities -------------------- */
+
+const useLocal = (k, v) => {
+  const [s, set] = React.useState(() => JSON.parse(localStorage.getItem(k)) || v)
+  const save = n => { set(n); localStorage.setItem(k, JSON.stringify(n)) }
+  return [s, save]
+}
+
+/* -------------------- UI Components -------------------- */
+
+const LockedOverlay = ({ message }) => (
+  <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
+    <div className="text-center text-sm text-gray-300">
+      <i className="fas fa-lock text-xl mb-2"></i>
+      <p>{message}</p>
+    </div>
+  </div>
+)
+
+const Vault = ({ config, onSave }) => {
+  const [c, set] = React.useState(config)
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+      <div className="bg-zinc-900 w-full max-w-xl p-6 rounded-xl border border-zinc-700">
+        <h2 className="text-xl font-bold mb-4">Configuration</h2>
+
+        {[
+          ["Gemini API Key","gemini"],
+          ["YouTube Data API Key","yt"],
+          ["Channel ID","channel"],
+        ].map(([l,k])=>(
+          <div key={k} className="mb-3">
+            <label className="text-xs text-gray-400">{l}</label>
+            <input className="w-full p-2 bg-black border border-zinc-700 rounded"
+              value={c[k]} onChange={e=>set({...c,[k]:e.target.value})}/>
+          </div>
+        ))}
+
+        <label className="text-xs text-gray-400">YouTube Analytics OAuth Token</label>
+        <textarea className="w-full p-2 bg-black border border-zinc-700 rounded h-20"
+          value={c.token} onChange={e=>set({...c,token:e.target.value})}></textarea>
+
+        <button onClick={()=>onSave(c)}
+          className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded font-bold">
+          Save & Apply
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* -------------------- Chat Dock -------------------- */
+
+const ChatDock = ({ enabled }) => {
+  const [open,set]=React.useState(false)
+  return (
+    <div className="h-14 border-t border-zinc-800 bg-zinc-900 flex flex-col">
+      <button onClick={()=>set(!open)}
+        className="h-14 text-xs text-gray-400 hover:text-white">
+        <i className="fas fa-bolt mr-1"></i>
+        FLUX AI {open ? "▼" : "▲"}
+      </button>
+      {open && (
+        <div className="p-3 text-sm border-t border-zinc-800">
+          {enabled
+            ? "Flux ready. Ask about retention, CTR, or strategy."
+            : "Connect Gemini API to activate Flux."}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* -------------------- Views -------------------- */
+
+const View = ({ title, locked, lockMsg, children }) => (
+  <div className="relative h-full">
+    <h1 className="text-xl font-bold mb-4">{title}</h1>
+    <div className={locked ? "locked h-full" : "h-full"}>
+      {children}
+    </div>
+    {locked && <LockedOverlay message={lockMsg} />}
+  </div>
+)
+
+/* -------------------- App -------------------- */
+
+const App = () => {
+  const [cfg, setCfg] = useLocal("flux_cfg", {
+    gemini:"", yt:"", channel:"", token:""
+  })
+  const [tab, setTab] = React.useState("dashboard")
+  const [showVault, setShowVault] = React.useState(false)
+  const [sidebar, setSidebar] = React.useState(true)
+
+  const signedIn = cfg.gemini && cfg.yt && cfg.channel
+  const analytics = signedIn && cfg.token
+
+  return (
+    <div className="h-screen flex overflow-hidden">
+
+      {/* Sidebar */}
+      <div className={`${sidebar ? "w-56" : "w-16"} transition-all bg-black border-r border-zinc-800 flex flex-col`}>
+        <button onClick={()=>setSidebar(!sidebar)}
+          className="p-4 text-gray-400 hover:text-white">
+          <i className="fas fa-bars"></i>
+        </button>
+        {[
+          ["dashboard","Dashboard"],
+          ["content","Content"],
+          ["monetize","Monetization"],
+          ["chrono","Chrono Sync"]
+        ].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)}
+            className={`px-4 py-3 text-left text-sm ${tab===k?"text-indigo-400":"text-gray-400"}`}>
+            {sidebar ? l : <i className="fas fa-circle"></i>}
+          </button>
+        ))}
+        <button onClick={()=>setShowVault(true)}
+          className="mt-auto p-4 text-gray-400 hover:text-white">
+          <i className="fas fa-cog"></i>
+        </button>
+      </div>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col">
+        <div className="h-14 border-b border-zinc-800 px-6 flex items-center justify-between">
+          <span className="text-sm font-bold">FLUX v5</span>
+          <span className={`text-xs ${signedIn?"text-green-400":"text-red-400"}`}>
+            {signedIn ? "Connected" : "Not Configured"}
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6">
+          {tab==="dashboard" && (
+            <View title="Dashboard"
+              locked={!signedIn}
+              lockMsg="Configure APIs to view channel data">
+              Channel overview loaded from YouTube APIs.
+            </View>
+          )}
+          {tab==="content" && (
+            <View title="Content Lab"
+              locked={!analytics}
+              lockMsg="YouTube Analytics required">
+              Video-level performance insights.
+            </View>
+          )}
+          {tab==="monetize" && (
+            <View title="Monetization"
+              locked={!analytics}
+              lockMsg="Analytics access required">
+              Revenue and eligibility metrics.
+            </View>
+          )}
+          {tab==="chrono" && (
+            <View title="Chrono Sync"
+              locked={!analytics}
+              lockMsg="Audience timing requires analytics">
+              Audience activity patterns.
+            </View>
+          )}
+        </div>
+
+        <ChatDock enabled={!!cfg.gemini} />
+      </div>
+
+      {showVault && <Vault config={cfg} onSave={c=>{setCfg(c);setShowVault(false)}} />}
+    </div>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>)
+
+</script>
+</body>
+</html>
